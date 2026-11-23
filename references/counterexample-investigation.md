@@ -18,7 +18,7 @@ Classify as `PROPERTY` (contract/property mismatch), `MODEL` (source behavior re
 
 Long runs are slow to repeat. To study a violation or check a model repair, start TLC at the failure instead of at `Init`:
 
-- Copy the last state of the trace into an `ErrorState` predicate and use it as `INIT`. For an action-property violation, start from the next-to-last state. TLC v1.8.0 also writes a `<Model>_TTrace_<n>.tla` module into the run's `inputs/` directory that replays the whole trace; it is a ready source for these states.
+- Copy the last state of the trace into an `ErrorState` predicate and use it as `INIT`. For an action-property violation, start from the next-to-last state. The states are in `tlc.log`. A TLC 1.8 pre-release passed with `--jar` also writes a `<Model>_TTrace_<n>.tla` module into the run's `inputs/` directory that replays the whole trace.
 - Model values from the configuration (such as `p1`) must be declared as constants in the module and assigned to themselves in the configuration before a copied state parses.
 - Name each conjunct of a violated invariant separately in the configuration so TLC reports which one failed.
 
