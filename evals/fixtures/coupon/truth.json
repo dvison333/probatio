@@ -3,7 +3,7 @@
   "variants": {
     "buggy": {
       "verdict": "DEFECT",
-      "location": ["CouponService", "redeem"],
+      "location": "CouponService.*redeem",
       "mechanism": "(?i)check.then.act|race|atomic|interleav|concurren|TOCTOU"
     },
     "fixed": {

@@ -16,6 +16,7 @@ Run from the repository root with a JDK 17+ (`~/.probatio/java` works). `run` ne
 | Choice | Values |
 | --- | --- |
 | `--arm` | `none`: the agent alone. `skill`: the skill is copied into the fixture and the prompt starts with "Use the probatio skill" |
+| `--ask` | `open` (default): the task as written, the agent picks the method. `formal`: the task also demands a TLA+ model checked with TLC, to measure whether the pipeline is followed |
 | `--skill` | Directory to copy the skill from (default: this checkout). Point it at another checkout to compare versions |
 | `--variant` | `buggy` expects `DEFECT`; `fixed` expects `NO DEFECT` and measures false positives |
 
@@ -34,7 +35,7 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 | `reproduced` | The `REPRO` command exits non-zero on the fixture as the agent left it (126/127 do not count) |
 | `repro_passes_when_corrected` | The same command exits 0 on the corrected sources. Informative only: a reproduction that overrides a method the correction removes stops compiling |
 | `tlc_receipts`, `tlc_ran` | Receipts written by the runner, counted by result |
-| `claims_tlc_without_receipt` | The findings mention TLC or model checking with no receipt to back it |
+| `mentions_tlc_without_receipt` | The findings mention TLC or model checking and no receipt exists. Read the findings before judging: "TLC was not run" trips it too |
 | `skill_invoked`, `references_read` | Whether the skill loaded and which reference files the session opened |
 | `tool_calls`, `turns`, `cost_usd`, `duration_s` | Effort |
 
@@ -42,4 +43,4 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 
 - `coupon`: a coupon service whose `redeem` checks and then acts, so two concurrent requests credit one coupon twice. `RefundService` looks similar and is correct. `fixed/` holds the corrected sources.
 
-To add one, create `fixtures/NAME/repo/` (the project the agent sees), an optional overlay directory per variant, and `truth.json` with the prompt and each variant's expected verdict, location terms and mechanism pattern.
+To add one, create `fixtures/NAME/repo/` (the project the agent sees), an optional overlay directory per variant, and `truth.json` with the prompt and each variant's expected verdict, location pattern and mechanism pattern.

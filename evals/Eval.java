@@ -33,7 +33,9 @@ public class Eval {
     static final Pattern LOCATION = Pattern.compile("(?m)^LOCATION:\\s*(.+)$");
     static final Pattern REPRO = Pattern.compile("(?m)^REPRO:\\s*(.+)$");
     static final Pattern REFERENCE = Pattern.compile("references/([a-z-]+\\.md)");
-    static final Pattern CLAIMS_TLC = Pattern.compile("(?i)\\bTLC\\b|model.check");
+    static final Pattern MENTIONS_TLC = Pattern.compile("(?i)\\bTLC\\b|model.check");
+    static final String FORMAL_ASK = " Do this as formal verification: write a TLA+ model of the behavior, check it "
+        + "with the TLC model checker, and report what TLC actually checked.";
     /** Shell exit codes that mean the command itself could not run, so it shows nothing about the defect. */
     static final Set<Integer> NOT_RUN = Set.of(126, 127);
     static final int REPRO_SECONDS = 180;
@@ -45,9 +47,9 @@ public class Eval {
         }
         if (argv.length < 1 || !argv[0].equals("run")) {
             throw new ProbatioException("usage: Eval run --fixture NAME --variant NAME --arm none|skill --model MODEL "
-                + "--out DIR [--skill DIR] [--budget USD] [--timeout-min N]  |  Eval grade DIR");
+                + "--out DIR [--ask open|formal] [--skill DIR] [--budget USD] [--timeout-min N]  |  Eval grade DIR");
         }
-        Map<String, String> options = new LinkedHashMap<>(Map.of("skill", ".", "budget", "8", "timeout-min", "60"));
+        Map<String, String> options = new LinkedHashMap<>(Map.of("skill", ".", "ask", "open", "budget", "8", "timeout-min", "60"));
         for (int i = 1; i + 1 < argv.length; i += 2) {
             options.put(argv[i].replaceFirst("^--", ""), argv[i + 1]);
         }
@@ -97,12 +99,18 @@ public class Eval {
         meta.put("fixture", options.get("fixture"));
         meta.put("variant", options.get("variant"));
         meta.put("arm", options.get("arm"));
+        meta.put("ask", options.get("ask"));
         meta.put("model", options.get("model"));
         meta.put("skill_revision", skill ? revision(skillSource) : null);
         meta.put("truth", fixture.resolve("truth.json").toString());
         Files.writeString(out.resolve("run.json"), Json.write(meta, true) + "\n");
 
-        String prompt = (skill ? "Use the probatio skill for this task. " : "") + truth.get("prompt");
+        boolean formal = switch (options.get("ask")) {
+            case "formal" -> true;
+            case "open" -> false;
+            default -> throw new ProbatioException("--ask must be open or formal");
+        };
+        String prompt = (skill ? "Use the probatio skill for this task. " : "") + truth.get("prompt") + (formal ? FORMAL_ASK : "");
         List<String> command = List.of("claude", "-p", prompt, "--model", options.get("model"),
             "--setting-sources", "project", "--strict-mcp-config", "--dangerously-skip-permissions",
             "--no-session-persistence", "--output-format", "stream-json", "--verbose",
@@ -140,7 +148,7 @@ public class Eval {
         result.put("false_positive", !defectExpected && "DEFECT".equals(verdict));
         if (defectExpected) {
             String location = String.valueOf(first(LOCATION, findings));
-            result.put("located", list(expected.get("location")).stream().allMatch(term -> location.contains((String) term)));
+            result.put("located", Pattern.compile((String) expected.get("location")).matcher(location).find());
             result.put("mechanism_named", Pattern.compile((String) expected.get("mechanism")).matcher(findings).find());
             gradeRepro(out, work, first(REPRO, findings), Path.of((String) meta.get("truth")).getParent(), result);
         }
@@ -148,7 +156,7 @@ public class Eval {
         Map<String, Long> receipts = receipts(work);
         result.put("tlc_receipts", receipts);
         result.put("tlc_ran", !receipts.isEmpty());
-        result.put("claims_tlc_without_receipt", receipts.isEmpty() && CLAIMS_TLC.matcher(findings).find());
+        result.put("mentions_tlc_without_receipt", receipts.isEmpty() && MENTIONS_TLC.matcher(findings).find());
         gradeTranscript(out.resolve("transcript.jsonl"), result);
         Files.writeString(out.resolve("result.json"), Json.write(result, true) + "\n");
         return result;
@@ -249,10 +257,13 @@ public class Eval {
         return null;
     }
 
-    /** Every arm gets the JDK running this program first on PATH, so the baseline can build the fixture too. */
-    static void withJdk(ProcessBuilder builder) {
-        String java = ProcessHandle.current().info().command().orElseThrow();
-        builder.environment().merge("PATH", Path.of(java).getParent().toString(), (old, jdk) -> jdk + ":" + old);
+    /**
+     * Every arm gets the JDK running this program first on PATH, so the baseline can build the fixture too.
+     * The launcher may be a link such as ~/.probatio/java; its real directory is the one that also holds javac.
+     */
+    static void withJdk(ProcessBuilder builder) throws IOException {
+        Path java = Path.of(ProcessHandle.current().info().command().orElseThrow()).toRealPath();
+        builder.environment().merge("PATH", java.getParent().toString(), (old, jdk) -> jdk + ":" + old);
     }
 
     static String revision(Path repo) throws Exception {
@@ -315,9 +326,5 @@ public class Eval {
     @SuppressWarnings("unchecked")
     static Map<String, Object> map(Object value) {
         return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    }
-
-    static List<?> list(Object value) {
-        return value instanceof List<?> l ? l : List.of();
     }
 }
