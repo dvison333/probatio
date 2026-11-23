@@ -17,6 +17,7 @@ Run from the repository root with a JDK 17+ (`~/.probatio/java` works). `run` ne
 | --- | --- |
 | `--arm` | `none`: the agent alone. `skill`: the skill is copied into the fixture and the prompt starts with "Use the probatio skill" |
 | `--ask` | `open` (default): the task as written, the agent picks the method. `formal`: the task also demands a TLA+ model checked with TLC, to measure whether the pipeline is followed |
+| `--fixtures` | Directory holding the fixtures (default `evals/fixtures`). Fixtures made from private code live outside this repository |
 | `--skill` | Directory to copy the skill from (default: this checkout). Point it at another checkout to compare versions |
 | `--variant` | `buggy` expects `DEFECT`; `fixed` expects `NO DEFECT` and measures false positives |
 
@@ -47,5 +48,7 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 - `shop`: orders, stock reservations, a payment gateway that can time out, a reaper and a retrier, in about 600 lines. Every operation is atomic; the defect needs five of them in a row and three components. The corrected variant still expires reservations of pending orders, which looks like the defect and is harmless there. `check/Explore.java` replays every operation sequence to a depth on the real classes: it finds the oversell in `repo/` and nothing with `fixed/`.
 
 Check a new fixture by machine before spending sessions on it. The first `docstore` carried a second, unplanted defect, and every agent found it.
+
+A variant with no `verdict` in `truth.json` has no known answer, as with a real codebase: the run records the verdict, location and whether the reproduction command fails, and grades nothing for correctness. Check those findings by hand.
 
 To add one, create `fixtures/NAME/repo/` (the project the agent sees), an optional overlay directory per variant, and `truth.json` with the prompt and each variant's expected verdict, location pattern and mechanism pattern.

@@ -47,9 +47,10 @@ public class Eval {
         }
         if (argv.length < 1 || !argv[0].equals("run")) {
             throw new ProbatioException("usage: Eval run --fixture NAME --variant NAME --arm none|skill --model MODEL "
-                + "--out DIR [--ask open|formal] [--skill DIR] [--budget USD] [--timeout-min N]  |  Eval grade DIR");
+                + "--out DIR [--ask open|formal] [--skill DIR] [--fixtures DIR] [--budget USD] [--timeout-min N]  |  Eval grade DIR");
         }
-        Map<String, String> options = new LinkedHashMap<>(Map.of("skill", ".", "ask", "open", "budget", "8", "timeout-min", "60"));
+        Map<String, String> options = new LinkedHashMap<>(Map.of("skill", ".", "ask", "open", "fixtures", "evals/fixtures",
+            "budget", "8", "timeout-min", "60"));
         for (int i = 1; i + 1 < argv.length; i += 2) {
             options.put(argv[i].replaceFirst("^--", ""), argv[i + 1]);
         }
@@ -65,10 +66,10 @@ public class Eval {
 
     static void run(Map<String, String> options, Path out) throws Exception {
         Path root = Path.of("").toAbsolutePath();
-        Path fixture = root.resolve("evals/fixtures").resolve(options.get("fixture"));
-        if (out.startsWith(root)) {
-            throw new ProbatioException("--out must be outside the repository: an agent working inside it could read "
-                + "the answer in " + fixture.resolve("truth.json"));
+        Path fixture = root.resolve(options.get("fixtures")).normalize().resolve(options.get("fixture"));
+        if (out.startsWith(root) || out.startsWith(fixture)) {
+            throw new ProbatioException("--out must be outside the repository and the fixture: an agent working inside "
+                + "either could read the answer in " + fixture.resolve("truth.json"));
         }
         Map<String, Object> truth = map(Json.parse(Files.readString(fixture.resolve("truth.json"))));
         Map<String, Object> variant = map(map(truth.get("variants")).get(options.get("variant")));
@@ -141,16 +142,25 @@ public class Eval {
         Map<String, Object> result = new LinkedHashMap<>(meta);
         result.remove("truth");
         String verdict = first(VERDICT, findings);
-        boolean defectExpected = "DEFECT".equals(expected.get("verdict"));
-        result.put("expected_verdict", expected.get("verdict"));
+        Object expectedVerdict = expected.get("verdict");
+        result.put("expected_verdict", expectedVerdict);
         result.put("verdict", verdict);
-        result.put("verdict_correct", expected.get("verdict").equals(verdict));
-        result.put("false_positive", !defectExpected && "DEFECT".equals(verdict));
-        if (defectExpected) {
-            String location = String.valueOf(first(LOCATION, findings));
-            result.put("located", Pattern.compile((String) expected.get("location")).matcher(location).find());
-            result.put("mechanism_named", Pattern.compile((String) expected.get("mechanism")).matcher(findings).find());
-            gradeRepro(out, work, first(REPRO, findings), Path.of((String) meta.get("truth")).getParent(), result);
+        if (expectedVerdict == null) {
+            // A real codebase has no known answer: record what the session claims and whether its command fails.
+            result.put("location", first(LOCATION, findings));
+            if ("DEFECT".equals(verdict)) {
+                gradeRepro(out, work, first(REPRO, findings), Path.of((String) meta.get("truth")).getParent(), result);
+            }
+        } else {
+            boolean defectExpected = "DEFECT".equals(expectedVerdict);
+            result.put("verdict_correct", expectedVerdict.equals(verdict));
+            result.put("false_positive", !defectExpected && "DEFECT".equals(verdict));
+            if (defectExpected) {
+                String location = String.valueOf(first(LOCATION, findings));
+                result.put("located", Pattern.compile((String) expected.get("location")).matcher(location).find());
+                result.put("mechanism_named", Pattern.compile((String) expected.get("mechanism")).matcher(findings).find());
+                gradeRepro(out, work, first(REPRO, findings), Path.of((String) meta.get("truth")).getParent(), result);
+            }
         }
 
         Map<String, Long> receipts = receipts(work);
