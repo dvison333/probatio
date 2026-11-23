@@ -38,6 +38,7 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 | `tlc_receipts` | Receipts written by the skill's runner, counted by result |
 | `tlc_direct` | The session called `tlc2.TLC` itself, without the runner; such a run leaves no receipt |
 | `statechart_used` | The session ran pstack's `statechart` script, which runs TLC itself and leaves no receipt |
+| `tlc_script_used` | The session ran a skill's `scripts/tlc.py` (Specular's lite skill), which leaves its own log and no receipt |
 | `generated_skills` | Project skills the session wrote: a lasting check for the next agent |
 | `mentions_tlc_without_receipt` | The findings mention TLC or model checking and no receipt exists. Read the findings before judging: "TLC was not run" trips it too |
 | `skill_invoked`, `references_read` | Whether the skill loaded and which reference files the session opened |

@@ -34,6 +34,8 @@ public class Eval {
     static final Pattern LOCATION = Pattern.compile("(?m)^LOCATION:\\s*(.+)$");
     static final Pattern REPRO = Pattern.compile("(?m)^REPRO:\\s*(.+)$");
     static final Pattern REFERENCE = Pattern.compile("references/([a-z-]+\\.md)");
+    /** A guide inside the bundle that Specular's lite skill unpacks into its cache as shared-HASH/. */
+    static final Pattern BUNDLED_GUIDE = Pattern.compile("shared-[0-9a-f]+/([A-Za-z0-9_/-]+\\.md)");
     static final Pattern MENTIONS_TLC = Pattern.compile("(?i)\\bTLC\\b|model.check");
     static final String FORMAL_ASK = " Do this as formal verification: write a TLA+ model of the behavior, check it "
         + "with the TLC model checker, and report what TLC actually checked.";
@@ -277,6 +279,7 @@ public class Eval {
         boolean skillInvoked = false;
         boolean tlcDirect = false;
         boolean statechart = false;
+        boolean tlcScript = false;
         Map<String, Object> last = Map.of();
         long turns = 0;
         long segments = 0;
@@ -304,6 +307,11 @@ public class Eval {
                     String input = Json.write(block.get("input"), false);
                     tlcDirect |= input.contains("tlc2.TLC");
                     statechart |= input.contains("scripts/statechart");
+                    tlcScript |= input.contains("scripts/tlc.py");
+                    Matcher guide = BUNDLED_GUIDE.matcher(input);
+                    while (guide.find()) {
+                        references.add(guide.group(1));
+                    }
                     Matcher m = REFERENCE.matcher(input);
                     while (m.find()) {
                         references.add(m.group(1));
@@ -313,6 +321,7 @@ public class Eval {
         }
         result.put("tlc_direct", tlcDirect);
         result.put("statechart_used", statechart);
+        result.put("tlc_script_used", tlcScript);
         result.put("skill_invoked", skillInvoked);
         result.put("references_read", new ArrayList<>(references));
         result.put("tool_calls", toolCalls);
