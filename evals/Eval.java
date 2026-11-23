@@ -72,8 +72,9 @@ public class Eval {
                 + "either could read the answer in " + fixture.resolve("truth.json"));
         }
         Map<String, Object> truth = map(Json.parse(Files.readString(fixture.resolve("truth.json"))));
-        Map<String, Object> variant = map(map(truth.get("variants")).get(options.get("variant")));
-        if (variant.isEmpty()) {
+        Map<String, Object> variants = map(truth.get("variants"));
+        Map<String, Object> variant = map(variants.get(options.get("variant")));
+        if (!variants.containsKey(options.get("variant"))) {
             throw new ProbatioException("unknown variant " + options.get("variant") + " for " + fixture);
         }
         boolean skill = switch (options.get("arm")) {
