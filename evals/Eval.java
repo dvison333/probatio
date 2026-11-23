@@ -186,7 +186,9 @@ public class Eval {
         Map<String, Long> receipts = receipts(work);
         result.put("tlc_receipts", receipts);
         result.put("mentions_tlc_without_receipt", receipts.isEmpty() && MENTIONS_TLC.matcher(findings).find());
-        result.put("generated_skills", generatedSkills(work, list(meta.get("skills"))));
+        // Runs recorded before skills were named installed exactly one, as "probatio".
+        List<?> installed = meta.containsKey("skills") ? list(meta.get("skills")) : List.of("probatio");
+        result.put("generated_skills", generatedSkills(work, installed));
         gradeTranscript(out.resolve("transcript.jsonl"), result);
         Files.writeString(out.resolve("result.json"), Json.write(result, true) + "\n");
         return result;
