@@ -34,7 +34,8 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 | `located`, `mechanism_named` | The location line names the file and method; the text names the mechanism |
 | `reproduced` | The `REPRO` command exits non-zero on the fixture as the agent left it (126/127 do not count) |
 | `repro_passes_when_corrected` | The same command exits 0 on the corrected sources. Informative only: a reproduction that overrides a method the correction removes stops compiling |
-| `tlc_receipts`, `tlc_ran` | Receipts written by the runner, counted by result |
+| `tlc_receipts` | Receipts written by the skill's runner, counted by result |
+| `tlc_direct` | The session called `tlc2.TLC` itself, without the runner; such a run leaves no receipt |
 | `mentions_tlc_without_receipt` | The findings mention TLC or model checking and no receipt exists. Read the findings before judging: "TLC was not run" trips it too |
 | `skill_invoked`, `references_read` | Whether the skill loaded and which reference files the session opened |
 | `tool_calls`, `turns`, `cost_usd`, `duration_s` | Effort |

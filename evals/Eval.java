@@ -155,7 +155,6 @@ public class Eval {
 
         Map<String, Long> receipts = receipts(work);
         result.put("tlc_receipts", receipts);
-        result.put("tlc_ran", !receipts.isEmpty());
         result.put("mentions_tlc_without_receipt", receipts.isEmpty() && MENTIONS_TLC.matcher(findings).find());
         gradeTranscript(out.resolve("transcript.jsonl"), result);
         Files.writeString(out.resolve("result.json"), Json.write(result, true) + "\n");
@@ -209,6 +208,7 @@ public class Eval {
         Set<String> references = new TreeSet<>();
         long toolCalls = 0;
         boolean skillInvoked = false;
+        boolean tlcDirect = false;
         Map<String, Object> last = Map.of();
         for (String line : Files.isRegularFile(transcript) ? Files.readAllLines(transcript) : List.<String>of()) {
             Map<String, Object> event;
@@ -227,13 +227,16 @@ public class Eval {
                 if (item instanceof Map<?, ?> block && "tool_use".equals(block.get("type"))) {
                     toolCalls++;
                     skillInvoked |= "Skill".equals(block.get("name"));
-                    Matcher m = REFERENCE.matcher(Json.write(block.get("input"), false));
+                    String input = Json.write(block.get("input"), false);
+                    tlcDirect |= input.contains("tlc2.TLC");
+                    Matcher m = REFERENCE.matcher(input);
                     while (m.find()) {
                         references.add(m.group(1));
                     }
                 }
             }
         }
+        result.put("tlc_direct", tlcDirect);
         result.put("skill_invoked", skillInvoked);
         result.put("references_read", new ArrayList<>(references));
         result.put("tool_calls", toolCalls);
