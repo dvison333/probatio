@@ -5,7 +5,7 @@ description: Formally verifies software behavior through source-grounded TLA+ mo
 
 # Probatio: formal verification with TLA+
 
-Model the behavior in TLA+ from the source, check the model with TLC, and reproduce in the code what TLC finds. A code review or a passing test does not stand in for the TLC run: when the tooling is missing or a run did not complete, report formal verification as incomplete and say why.
+Model the behavior in TLA+ from the source, check the model with TLC, reproduce in the code what TLC finds, and leave a check that the next agent can rerun. A code review or a passing test does not stand in for the TLC run: when the tooling is missing or a run did not complete, report formal verification as incomplete and say why.
 
 ## Tools
 
@@ -18,7 +18,7 @@ J SKILL_DIR/scripts/Probatio.java tlc models/M.tla models/M.cfg --out checks/RUN
 J SKILL_DIR/scripts/Probatio.java regress suite.json --out checks/round-NN   # several configurations (and traces) in one run
 ```
 
-Branch on the exit code, then read the JSON on stdout (`tlc` also writes `receipt.json`, `regress` writes `results.json`):
+Run TLC only through `tlc` or `regress`: the receipt is what makes a result citable, and a direct `tlc2.TLC` call leaves none. Branch on the exit code, then read the JSON on stdout (`tlc` also writes `receipt.json`, `regress` writes `results.json`):
 
 | Exit | Meaning | Next step |
 | --- | --- | --- |
@@ -46,9 +46,20 @@ A nonempty `warnings` list (in the receipt and in each `regress` row) leaves the
 3. **Check.** Run `doctor` once, then `tlc` with small bounds first. Read the receipt, including `warnings`.
 4. **Investigate and reproduce.** Classify every counterexample, and take each `CANDIDATE` and each candidate from reading the code to a disposition.
 5. **Report.** Answer every question. Give the property, configuration, result and receipt for each check, the disposition of each candidate with its evidence, and the limits.
-6. **Leave the check behind.** Write a project skill at `.claude/skills/<area>/SKILL.md` (or the skills directory of the agent in use), named for the area it guards, so the next agent can recheck a change. Its frontmatter says when to use it: the files and functions the check covers. Its body gives the one command that reruns the check, what a pass and a failure look like, how to tell a real defect from a model that fell behind the code, the break that must still be caught, and the commit at which the model was last confirmed against the code. Use this repository's real paths and commands.
+6. **Leave the check behind.** Write a project skill at `.claude/skills/<area>/SKILL.md` (or the skills directory of the agent in use), named for the area it guards. Its frontmatter says when to use it: the files and functions the check covers. Its body gives the one command that reruns the check, what a pass and a failure look like, how to tell a real defect from a model that fell behind the code, the break that must still be caught, and the commit at which the model was last confirmed against the code. Use this repository's real paths and commands, then run the command once as written.
 
 Go through the steps without waiting for approval between them, unless the user asked for one step or a stopping point.
+
+## Done when
+
+- every question has an answer, and every check it cites has a receipt;
+- every configuration that passes has a variant that fails, with its own receipt;
+- the break in the real code was run, and the report says what was removed and what caught it, or why it could not be run;
+- every candidate has a disposition;
+- every environment behavior the verdict rests on was observed, or the verdict is given for each behavior it may have;
+- the project skill exists and its command ran.
+
+A report the user asked for in a given file or format is written as well, not instead.
 
 ## Read when the case calls for it
 
