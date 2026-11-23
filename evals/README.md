@@ -15,13 +15,13 @@ Run from the repository root with a JDK 17+ (`~/.probatio/java` works). `run` ne
 
 | Choice | Values |
 | --- | --- |
-| `--arm` | `none`: the agent alone. `skill`: the skill is copied into the fixture and the prompt starts with "Use the probatio skill" |
+| `--arm` | `none`: the agent alone. `skill`: the skills in `--skill` are copied into the fixture and the prompt starts with "Use the NAME skill", naming the first |
 | `--ask` | `open` (default): the task as written, the agent picks the method. `formal`: the task also demands a TLA+ model checked with TLC, to measure whether the pipeline is followed |
 | `--fixtures` | Directory holding the fixtures (default `evals/fixtures`). Fixtures made from private code live outside this repository |
-| `--skill` | Directory to copy the skill from (default: this checkout). Point it at another checkout to compare versions |
+| `--skill` | `NAME=DIR` entries separated by commas (default `probatio=.`). Point `DIR` at another checkout to compare versions, or at another skill to compare skills; later entries are companions the first one refers to |
 | `--variant` | `buggy` expects `DEFECT`; `fixed` expects `NO DEFECT` and measures false positives |
 
-Every arm gets the same task, the same JDK first on PATH, and no user-level settings, skills, plugins or MCP servers (`--setting-sources project --strict-mcp-config`). The session runs with permission checks off inside a fresh copy of the fixture, so `--out` must be outside this repository: an agent working inside it could read `truth.json`.
+Every arm gets the same task, the same JDK first on PATH, the same TLC jar through `TLA2TOOLS` and `JAVA` when `~/.probatio/tla2tools.jar` exists, and no user-level settings, skills, plugins or MCP servers (`--setting-sources project --strict-mcp-config`). The session runs with permission checks off inside a fresh copy of the fixture, so `--out` must be outside this repository: an agent working inside it could read `truth.json`.
 
 Change one thing between the runs you compare, and repeat each at least three times: sessions are not deterministic, and a single run proves nothing. With few fixtures, only large differences mean anything.
 
@@ -37,6 +37,8 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 | `repro_passes_when_corrected` | The same command exits 0 on the corrected sources. Informative only: a reproduction that overrides a method the correction removes stops compiling |
 | `tlc_receipts` | Receipts written by the skill's runner, counted by result |
 | `tlc_direct` | The session called `tlc2.TLC` itself, without the runner; such a run leaves no receipt |
+| `statechart_used` | The session ran pstack's `statechart` script, which runs TLC itself and leaves no receipt |
+| `generated_skills` | Project skills the session wrote: a lasting check for the next agent |
 | `mentions_tlc_without_receipt` | The findings mention TLC or model checking and no receipt exists. Read the findings before judging: "TLC was not run" trips it too |
 | `skill_invoked`, `references_read` | Whether the skill loaded and which reference files the session opened |
 | `tool_calls`, `turns`, `cost_usd`, `duration_s` | Effort |

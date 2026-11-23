@@ -24,8 +24,9 @@ import java.util.stream.Stream;
  * java -cp build/evals Eval grade /outside/the/repo/run-01
  * </pre>
  *
- * Arms: "none" runs the agent alone; "skill" copies the skill into the fixture and asks the agent to use it.
- * Both get the same task, the same JDK on PATH, and no user-level settings, skills, plugins or MCP servers.
+ * Arms: "none" runs the agent alone; "skill" copies the skills named by --skill into the fixture and asks the
+ * agent to use the first. Every arm gets the same task, the same JDK and TLC, and no user-level settings,
+ * skills, plugins or MCP servers.
  */
 public class Eval {
     static final Set<String> SKILL_EXCLUDES = Set.of(".git", ".claude", ".analysis", ".DS_Store", "build", "evals", "tests");
@@ -47,9 +48,10 @@ public class Eval {
         }
         if (argv.length < 1 || !argv[0].equals("run")) {
             throw new ProbatioException("usage: Eval run --fixture NAME --variant NAME --arm none|skill --model MODEL "
-                + "--out DIR [--ask open|formal] [--skill DIR] [--fixtures DIR] [--budget USD] [--timeout-min N]  |  Eval grade DIR");
+                + "--out DIR [--ask open|formal] [--skill NAME=DIR[,NAME=DIR...]] [--fixtures DIR] [--budget USD] "
+                + "[--timeout-min N]  |  Eval grade DIR");
         }
-        Map<String, String> options = new LinkedHashMap<>(Map.of("skill", ".", "ask", "open", "fixtures", "evals/fixtures",
+        Map<String, String> options = new LinkedHashMap<>(Map.of("skill", "probatio=.", "ask", "open", "fixtures", "evals/fixtures",
             "budget", "8", "timeout-min", "60"));
         for (int i = 1; i + 1 < argv.length; i += 2) {
             options.put(argv[i].replaceFirst("^--", ""), argv[i + 1]);
@@ -91,11 +93,23 @@ public class Eval {
         git(work, "init", "-q");
         git(work, "add", "-A");
         git(work, "-c", "user.name=eval", "-c", "user.email=eval@example.invalid", "commit", "-q", "-m", "fixture");
-        Path skillSource = root.resolve(options.get("skill")).normalize();
+        Map<String, Path> skills = new LinkedHashMap<>();
         if (skill) {
-            copyTree(skillSource, work.resolve(".claude/skills/probatio"), SKILL_EXCLUDES);
+            for (String entry : options.get("skill").split(",")) {
+                String[] named = entry.split("=", 2);
+                if (named.length != 2 || named[0].isBlank()) {
+                    throw new ProbatioException("--skill takes NAME=DIR entries separated by commas: " + entry);
+                }
+                Path source = root.resolve(named[1]).normalize();
+                if (!Files.isRegularFile(source.resolve("SKILL.md"))) {
+                    throw new ProbatioException("no SKILL.md in " + source);
+                }
+                skills.put(named[0], source);
+                copyTree(source, work.resolve(".claude/skills").resolve(named[0]), SKILL_EXCLUDES);
+            }
             Files.writeString(work.resolve(".git/info/exclude"), ".claude/\n");
         }
+        String used = skills.isEmpty() ? null : skills.keySet().iterator().next();
 
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("fixture", options.get("fixture"));
@@ -103,7 +117,8 @@ public class Eval {
         meta.put("arm", options.get("arm"));
         meta.put("ask", options.get("ask"));
         meta.put("model", options.get("model"));
-        meta.put("skill_revision", skill ? revision(skillSource) : null);
+        meta.put("skills", new ArrayList<>(skills.keySet()));
+        meta.put("skill_revision", skill ? revision(skills.get(used)) : null);
         meta.put("truth", fixture.resolve("truth.json").toString());
         Files.writeString(out.resolve("run.json"), Json.write(meta, true) + "\n");
 
@@ -112,7 +127,7 @@ public class Eval {
             case "open" -> false;
             default -> throw new ProbatioException("--ask must be open or formal");
         };
-        String prompt = (skill ? "Use the probatio skill for this task. " : "") + truth.get("prompt") + (formal ? FORMAL_ASK : "");
+        String prompt = (skill ? "Use the " + used + " skill for this task. " : "") + truth.get("prompt") + (formal ? FORMAL_ASK : "");
         List<String> command = List.of("claude", "-p", prompt, "--model", options.get("model"),
             "--setting-sources", "project", "--strict-mcp-config", "--dangerously-skip-permissions",
             "--no-session-persistence", "--output-format", "stream-json", "--verbose",
@@ -167,6 +182,7 @@ public class Eval {
         Map<String, Long> receipts = receipts(work);
         result.put("tlc_receipts", receipts);
         result.put("mentions_tlc_without_receipt", receipts.isEmpty() && MENTIONS_TLC.matcher(findings).find());
+        result.put("generated_skills", generatedSkills(work, list(meta.get("skills"))));
         gradeTranscript(out.resolve("transcript.jsonl"), result);
         Files.writeString(out.resolve("result.json"), Json.write(result, true) + "\n");
         return result;
@@ -197,6 +213,30 @@ public class Eval {
         }
     }
 
+    /** Project skills the session wrote itself: a lasting check for the next agent, beyond the findings. */
+    static List<String> generatedSkills(Path work, List<?> installed) throws IOException {
+        List<String> generated = new ArrayList<>();
+        for (String home : List.of(".claude/skills", ".agents/skills", ".cursor/skills")) {
+            Path skills = work.resolve(home);
+            if (!Files.isDirectory(skills)) {
+                continue;
+            }
+            try (Stream<Path> entries = Files.list(skills)) {
+                for (Path entry : entries.sorted().toList()) {
+                    String name = entry.getFileName().toString();
+                    if (!installed.contains(name) && Files.isRegularFile(entry.resolve("SKILL.md"))) {
+                        generated.add(home + "/" + name);
+                    }
+                }
+            }
+        }
+        return generated;
+    }
+
+    static List<?> list(Object value) {
+        return value instanceof List<?> l ? l : List.of();
+    }
+
     /** TLC results by kind, counted from receipts the runner wrote; a receipt without a jar hash is not one. */
     static Map<String, Long> receipts(Path work) throws IOException {
         Map<String, Long> byResult = new TreeMap<>();
@@ -220,6 +260,7 @@ public class Eval {
         long toolCalls = 0;
         boolean skillInvoked = false;
         boolean tlcDirect = false;
+        boolean statechart = false;
         Map<String, Object> last = Map.of();
         for (String line : Files.isRegularFile(transcript) ? Files.readAllLines(transcript) : List.<String>of()) {
             Map<String, Object> event;
@@ -240,6 +281,7 @@ public class Eval {
                     skillInvoked |= "Skill".equals(block.get("name"));
                     String input = Json.write(block.get("input"), false);
                     tlcDirect |= input.contains("tlc2.TLC");
+                    statechart |= input.contains("scripts/statechart");
                     Matcher m = REFERENCE.matcher(input);
                     while (m.find()) {
                         references.add(m.group(1));
@@ -248,6 +290,7 @@ public class Eval {
             }
         }
         result.put("tlc_direct", tlcDirect);
+        result.put("statechart_used", statechart);
         result.put("skill_invoked", skillInvoked);
         result.put("references_read", new ArrayList<>(references));
         result.put("tool_calls", toolCalls);
@@ -277,7 +320,15 @@ public class Eval {
      */
     static void withJdk(ProcessBuilder builder) throws IOException {
         Path java = Path.of(ProcessHandle.current().info().command().orElseThrow()).toRealPath();
-        builder.environment().merge("PATH", java.getParent().toString(), (old, jdk) -> jdk + ":" + old);
+        Map<String, String> env = builder.environment();
+        env.merge("PATH", java.getParent().toString(), (old, jdk) -> jdk + ":" + old);
+        // The same TLC for every arm: tools that would fetch their own (pstack's statechart) take these instead.
+        String home = env.getOrDefault("PROBATIO_HOME", Path.of(System.getProperty("user.home"), ".probatio").toString());
+        Path jar = Path.of(home, "tla2tools.jar");
+        if (Files.isRegularFile(jar)) {
+            env.put("TLA2TOOLS", jar.toString());
+            env.put("JAVA", java.toString());
+        }
     }
 
     static String revision(Path repo) throws Exception {
