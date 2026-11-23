@@ -77,6 +77,14 @@ public class EvalTest {
             if (unknown.containsKey("verdict_correct") || unknown.containsKey("repro_passes_when_corrected")) {
                 throw new AssertionError("a fixture without a known answer must not be graded for correctness: " + unknown);
             }
+            Path linked = tmp.resolve("linked");
+            Files.createDirectories(linked.resolve("real"));
+            Files.writeString(linked.resolve("real/file.txt"), "x");
+            Files.createSymbolicLink(linked.resolve("alias"), Path.of("real"));
+            Eval.copyTree(linked, tmp.resolve("linked-copy"), java.util.Set.of());
+            if (!Files.isSymbolicLink(tmp.resolve("linked-copy/alias")) || !Files.exists(tmp.resolve("linked-copy/alias/file.txt"))) {
+                throw new AssertionError("a link to a directory must be copied as a working link");
+            }
             System.out.println("grader tests passed");
         } finally {
             Eval.deleteTree(tmp);

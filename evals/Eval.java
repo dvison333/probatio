@@ -311,7 +311,12 @@ public class Eval {
                     continue;
                 }
                 Path target = destination.resolve(relative.toString());
-                if (Files.isDirectory(path)) {
+                if (Files.isSymbolicLink(path)) {
+                    // Kept as a link: followed, a link to a directory would arrive as an empty directory.
+                    Files.createDirectories(target.getParent());
+                    Files.deleteIfExists(target);
+                    Files.createSymbolicLink(target, Files.readSymbolicLink(path));
+                } else if (Files.isDirectory(path)) {
                     Files.createDirectories(target);
                 } else {
                     Files.createDirectories(target.getParent());
