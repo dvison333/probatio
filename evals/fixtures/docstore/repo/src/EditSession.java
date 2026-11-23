@@ -27,11 +27,9 @@ class EditSession {
 
     /** Saves the draft; on success the session continues from the new version. */
     DocStore.Result save() {
-        DocStore.Result result = store.update(id, seenVersion, draft);
-        if (result == DocStore.Result.OK) {
-            seenVersion = store.read(id).map(Doc::version).orElse(seenVersion);
-        }
-        return result;
+        DocStore.Saved saved = store.update(id, seenVersion, draft);
+        seenVersion = saved.version();
+        return saved.result();
     }
 
     DocStore.Result discardDocument() {

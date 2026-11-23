@@ -17,7 +17,7 @@ public class RunTests {
         check(ana.save() == DocStore.Result.OK, "a session keeps saving after its own save");
         check(bia.discardDocument() == DocStore.Result.CONFLICT, "stale delete is rejected");
         check(ana.discardDocument() == DocStore.Result.OK, "current delete succeeds");
-        check(store.update("notes", 1, "x") == DocStore.Result.NOT_FOUND, "update of a missing document");
+        check(store.update("notes", 1, "x").result() == DocStore.Result.NOT_FOUND, "update of a missing document");
         System.out.println("all tests passed");
     }
 

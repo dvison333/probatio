@@ -5,6 +5,9 @@ import java.util.concurrent.ConcurrentHashMap;
 class DocStore {
     enum Result { OK, EXISTS, NOT_FOUND, CONFLICT }
 
+    /** The outcome of an update and, when it is OK, the version the document now has. */
+    record Saved(Result result, long version) {}
+
     private final Map<String, Doc> docs = new ConcurrentHashMap<>();
     private final Versions versions;
     private final AuditLog audit;
@@ -27,19 +30,19 @@ class DocStore {
         return Result.OK;
     }
 
-    Result update(String id, long expectedVersion, String body) {
-        Result[] result = {Result.NOT_FOUND};
+    Saved update(String id, long expectedVersion, String body) {
+        Saved[] saved = {new Saved(Result.NOT_FOUND, expectedVersion)};
         docs.computeIfPresent(id, (key, current) -> {
             if (current.version() != expectedVersion) {
-                result[0] = Result.CONFLICT;
+                saved[0] = new Saved(Result.CONFLICT, expectedVersion);
                 return current;
             }
-            result[0] = Result.OK;
             Doc updated = new Doc(body, versions.next(current.version()));
+            saved[0] = new Saved(Result.OK, updated.version());
             audit.record("update", id, updated.version());
             return updated;
         });
-        return result[0];
+        return saved[0];
     }
 
     Result delete(String id, long expectedVersion) {

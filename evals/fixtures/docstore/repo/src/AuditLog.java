@@ -1,7 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
 
-/** Append-only record of store changes, in the order they were applied. */
+/** Append-only record of store changes, for support staff. */
 class AuditLog {
     record Entry(String action, String id, long version) {}
 
