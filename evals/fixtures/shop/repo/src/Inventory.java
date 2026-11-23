@@ -26,7 +26,7 @@ class Inventory {
         if (units <= 0) {
             throw new IllegalArgumentException("units must be positive");
         }
-        stocked.merge(sku, units, Integer::sum);
+        stocked.merge(sku, units, Math::addExact);
         available.merge(sku, units, Integer::sum);
     }
 
