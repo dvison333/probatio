@@ -307,7 +307,8 @@ public class Eval {
                     String input = Json.write(block.get("input"), false);
                     tlcDirect |= input.contains("tlc2.TLC");
                     statechart |= input.contains("scripts/statechart");
-                    tlcScript |= input.contains("scripts/tlc.py");
+                    // Not "scripts/tlc.py": sessions call it through a variable holding the scripts directory.
+                    tlcScript |= input.contains("tlc.py");
                     Matcher guide = BUNDLED_GUIDE.matcher(input);
                     while (guide.find()) {
                         references.add(guide.group(1));

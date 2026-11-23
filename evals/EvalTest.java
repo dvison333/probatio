@@ -126,7 +126,7 @@ public class EvalTest {
                 "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"references/ignored.md\"},"
                     + "{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"/x/.claude/skills/probatio/references/formal.md\"}},"
                     + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"java -cp t.jar tlc2.TLC M.tla\"}},"
-                    + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"cat /c/shared-0af3/code_analysis/guide.md; python3 s/scripts/tlc.py check MC.tla\"}}]}}",
+                    + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"cat /c/shared-0af3/code_analysis/guide.md; python3 $S/tlc.py check MC.tla\"}}]}}",
                 "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.0,\"num_turns\":6,\"duration_ms\":61000}",
                 "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.5,\"num_turns\":1,\"duration_ms\":2000}") + "\n");
         }
