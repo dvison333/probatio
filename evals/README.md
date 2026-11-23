@@ -41,7 +41,7 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 | `generated_skills` | Project skills the session wrote: a lasting check for the next agent |
 | `mentions_tlc_without_receipt` | The findings mention TLC or model checking and no receipt exists. Read the findings before judging: "TLC was not run" trips it too |
 | `skill_invoked`, `references_read` | Whether the skill loaded and which reference files the session opened |
-| `tool_calls`, `turns`, `cost_usd`, `duration_s` | Effort |
+| `tool_calls`, `turns`, `cost_usd`, `duration_s` | Effort. `duration_s` is wall-clock time for the whole session, including waits on its own background tasks; `segments` above 1 means it had such waits |
 
 ## Fixtures
 

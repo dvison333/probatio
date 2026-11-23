@@ -135,6 +135,7 @@ public class Eval {
         ProcessBuilder builder = new ProcessBuilder(command).directory(work.toFile())
             .redirectOutput(out.resolve("transcript.jsonl").toFile()).redirectError(out.resolve("stderr.log").toFile());
         withJdk(builder);
+        long started = System.nanoTime();
         Process process = builder.start();
         process.getOutputStream().close();
         boolean finished = process.waitFor(Long.parseLong(options.get("timeout-min")), TimeUnit.MINUTES);
@@ -143,6 +144,7 @@ public class Eval {
             process.destroyForcibly().waitFor();
         }
         meta.put("timed_out", !finished);
+        meta.put("wall_s", (System.nanoTime() - started) / 1_000_000_000L);
         Files.writeString(out.resolve("run.json"), Json.write(meta, true) + "\n");
     }
 
@@ -157,6 +159,8 @@ public class Eval {
 
         Map<String, Object> result = new LinkedHashMap<>(meta);
         result.remove("truth");
+        result.remove("wall_s");
+        result.put("duration_s", meta.get("wall_s") instanceof Number wall ? wall.longValue() : wallFromFiles(out));
         String verdict = first(VERDICT, findings);
         Object expectedVerdict = expected.get("verdict");
         result.put("expected_verdict", expectedVerdict);
@@ -213,6 +217,16 @@ public class Eval {
         }
     }
 
+    /** For runs recorded before the runner timed them: from the work directory's creation to the last transcript write. */
+    static Long wallFromFiles(Path out) throws IOException {
+        Path transcript = out.resolve("transcript.jsonl");
+        if (!Files.isRegularFile(transcript)) {
+            return null;
+        }
+        long created = Files.readAttributes(out.resolve("work"), java.nio.file.attribute.BasicFileAttributes.class).creationTime().toMillis();
+        return Math.max(0, (Files.getLastModifiedTime(transcript).toMillis() - created) / 1000);
+    }
+
     /** Project skills the session wrote itself: a lasting check for the next agent, beyond the findings. */
     static List<String> generatedSkills(Path work, List<?> installed) throws IOException {
         List<String> generated = new ArrayList<>();
@@ -262,6 +276,8 @@ public class Eval {
         boolean tlcDirect = false;
         boolean statechart = false;
         Map<String, Object> last = Map.of();
+        long turns = 0;
+        long segments = 0;
         for (String line : Files.isRegularFile(transcript) ? Files.readAllLines(transcript) : List.<String>of()) {
             Map<String, Object> event;
             try {
@@ -270,7 +286,11 @@ public class Eval {
                 continue;
             }
             if ("result".equals(event.get("type"))) {
+                // A session that waits on its own background task ends in several segments, each with a result.
+                // Cost is cumulative; turns are per segment.
                 last = event;
+                segments++;
+                turns += event.get("num_turns") instanceof Number n ? n.longValue() : 0;
             }
             if (!"assistant".equals(event.get("type")) || !(map(event.get("message")).get("content") instanceof List<?> content)) {
                 continue;
@@ -296,8 +316,8 @@ public class Eval {
         result.put("tool_calls", toolCalls);
         result.put("session_completed", "success".equals(last.get("subtype")));
         result.put("cost_usd", last.get("total_cost_usd"));
-        result.put("turns", last.get("num_turns"));
-        result.put("duration_s", last.get("duration_ms") instanceof Number ms ? ms.longValue() / 1000 : null);
+        result.put("turns", turns);
+        result.put("segments", segments);
     }
 
     /** Exit code of a shell command, or null when it did not finish in time. */
