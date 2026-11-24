@@ -10,17 +10,14 @@ Serve para propriedades como: um pagamento nunca é processado duas vezes, um te
 
 ## Como funciona
 
-0. **Levantamento** (só quando o pedido não diz o que verificar): encontra as máquinas de estados implícitas no código, lista estados, transições e combinações impossíveis, e as ordena por risco para escolher o que modelar.
-1. **Escopo**: define as perguntas, os contratos esperados e o que fica de fora.
-2. **Investigação**: segue o código pelos pontos de entrada, mudanças de estado e recuperação de erros, e monta uma matriz de cenários.
-3. **Modelagem incremental**: começa com o menor modelo fiel ao código e adiciona um mecanismo ou falha por vez.
-4. **Instrumentação**: captura traces da implementação real.
-5. **Validação de traces**: confere se o modelo admite as execuções observadas.
-6. **Model checking**: roda o TLC e classifica cada contraexemplo como erro da propriedade, erro do modelo ou possível defeito.
-7. **Reprodução**: tenta reproduzir no código cada defeito candidato.
-8. **Relatório**: registra resultados, limites do modelo e o que ficou sem cobertura.
+1. **Escopo**: escreve cada pergunta como um gatilho e um resultado observável, com o contrato usado para julgá-la. Quando o pedido não diz o que verificar, ordena por risco as máquinas de estados implícitas no código e escolhe uma.
+2. **Modelo**: começa com o menor modelo fiel ao código e adiciona um mecanismo ou falha por vez.
+3. **Checagem**: roda o TLC pelo runner incluído, que deixa um recibo com hash de cada execução.
+4. **Investigação e reprodução**: classifica cada contraexemplo como erro da propriedade, erro do modelo ou possível defeito, e leva cada candidato a um teste que falha no código real.
+5. **Relatório**: responde a cada pergunta, com o destino e a evidência de cada candidato e os limites da checagem.
+6. **Checagem que fica**: escreve uma pequena skill do projeto que roda a checagem de novo, para verificar a próxima mudança no código coberto.
 
-O fluxo completo está em [SKILL.md](SKILL.md) e os detalhes de cada etapa em [references/](references/).
+Um resultado é julgado por algumas qualidades, descritas no [SKILL.md](SKILL.md): o modelo é fiel ao código, a propriedade consegue falhar (no modelo e no código real), todo candidato é fechado, o comportamento que depende do ambiente (a trava de um banco, a ordem de uma fila) é observado em vez de suposto, e o escopo é declarado com honestidade. A validação de traces contra a implementação real está disponível quando o caso pede; os guias em [references/](references/) são lidos sob demanda.
 
 Um resultado do TLC vale para o modelo finito verificado, não é uma prova ilimitada de que a implementação está correta. O relatório deixa esses limites explícitos.
 
