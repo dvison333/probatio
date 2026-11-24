@@ -51,9 +51,9 @@ public class EvalTest {
             expect(found, Map.of("verdict_correct", true, "false_positive", false, "located", true, "mechanism_named", true,
                 "reproduced", true, "repro_passes_when_corrected", true, "tlc_direct", true, "mentions_tlc_without_receipt", false));
             expect(found, Map.of("duration_s", 90L));
-            expect(found, Map.of("generated_skills", List.of(".claude/skills/coupon-redemption"), "statechart_used", false));
+            expect(found, Map.of("generated_skills", List.of(".claude/skills/coupon-redemption"), "statechart_used", false, "tlc_script_used", true));
             expect(found, Map.of("tlc_receipts", Map.of("violation", 1L), "cost_usd", 1.5, "turns", 7L, "segments", 2L,
-                "references_read", List.of("formal.md"), "skill_invoked", true, "tool_calls", 3L, "session_completed", true));
+                "references_read", List.of("code_analysis/guide.md", "formal.md"), "skill_invoked", true, "tool_calls", 4L, "session_completed", true));
 
             Map<String, Object> missed = grade(tmp.resolve("missed"), "buggy",
                 "VERDICT: NO DEFECT\nLOCATION: none\nREPRO: none\nTLC found nothing.\n", false, false);
@@ -125,7 +125,8 @@ public class EvalTest {
                 "not json",
                 "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"references/ignored.md\"},"
                     + "{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"/x/.claude/skills/probatio/references/formal.md\"}},"
-                    + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"java -cp t.jar tlc2.TLC M.tla\"}}]}}",
+                    + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"java -cp t.jar tlc2.TLC M.tla\"}},"
+                    + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"cat /c/shared-0af3/code_analysis/guide.md; python3 $S/tlc.py check MC.tla\"}}]}}",
                 "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.0,\"num_turns\":6,\"duration_ms\":61000}",
                 "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.5,\"num_turns\":1,\"duration_ms\":2000}") + "\n");
         }
