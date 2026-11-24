@@ -73,6 +73,11 @@ install_jar() {
 install_jdk() {
   existing=$(command -v java 2>/dev/null || true)
   if [ -n "$existing" ] && usable_jdk "$existing"; then
+    # With $HOME_DIR on PATH, the java found is the link this script maintains: relinking would point it at itself.
+    if [ "$(cd "$(dirname "$existing")" && pwd -P)" = "$(cd "$HOME_DIR" && pwd -P)" ]; then
+      echo "Keeping the JDK already linked at $HOME_DIR/java"
+      return
+    fi
     echo "Using the JDK on PATH: $existing"
     ln -sf "$existing" "$HOME_DIR/java"
     return

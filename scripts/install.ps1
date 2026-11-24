@@ -48,8 +48,16 @@ if ((Test-Path $jar) -and ((Get-FileHash -Algorithm SHA256 $jar).Hash.ToLower() 
     Get-Verified $TlaUrl $jar $TlaSha256
 }
 
+$shim = Join-Path $HomeDir 'java.cmd'
 $existing = Get-Command java -ErrorAction SilentlyContinue
-if ($existing -and (Test-UsableJdk $existing.Source)) {
+# With $HomeDir on PATH, the java found is the shim this script maintains: rewriting it would make it call itself.
+$isShim = $existing -and ((Split-Path $existing.Source -Parent) -eq (Resolve-Path $HomeDir).Path)
+if ($isShim -and (Test-UsableJdk $existing.Source)) {
+    Write-Host "Keeping the JDK already linked at $shim"
+    Write-Host "Probatio toolchain ready in $HomeDir"
+    exit 0
+}
+if ($existing -and -not $isShim -and (Test-UsableJdk $existing.Source)) {
     $java = $existing.Source
     Write-Host "Using the JDK on PATH: $java"
 } else {
@@ -67,7 +75,6 @@ if ($existing -and (Test-UsableJdk $existing.Source)) {
     $java = Join-Path $target 'bin\java.exe'
 }
 
-$shim = Join-Path $HomeDir 'java.cmd'
 Set-Content -Path $shim -Encoding ASCII -Value "@`"$java`" %*"
 Write-Host "Probatio toolchain ready in $HomeDir"
 Write-Host "Run: & '$shim' scripts\Probatio.java tlc Model.tla Model.cfg --out checks\run-01"
