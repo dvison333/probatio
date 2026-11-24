@@ -62,7 +62,7 @@ Ask the agent in plain language:
 - "Use $probatio to model tenant access transitions and check isolation."
 - "Resume $probatio from `.analysis/payment-retries/progress.md`."
 
-Each analysis writes its artifacts to `.analysis/<run-id>/` in the target project, starting from the templates in `assets/workspace/`.
+Each analysis writes its artifacts to `.analysis/<run-id>/` in the target project. The optional `init` command creates that directory from the templates in `assets/workspace/`, stamped with the source revision.
 
 ## Tools
 

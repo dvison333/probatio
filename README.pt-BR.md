@@ -62,7 +62,7 @@ Peça ao agente em linguagem natural:
 - "Use $probatio to model tenant access transitions and check isolation."
 - "Resume $probatio from `.analysis/payment-retries/progress.md`."
 
-Os artefatos de cada análise ficam em `.analysis/<run-id>/` no projeto analisado, a partir dos templates em `assets/workspace/`.
+Os artefatos de cada análise ficam em `.analysis/<run-id>/` no projeto analisado. O comando opcional `init` cria essa pasta a partir dos templates em `assets/workspace/`, com a revisão do código registrada.
 
 ## Ferramentas
 
