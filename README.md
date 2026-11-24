@@ -10,17 +10,14 @@ It targets properties such as: a payment is never processed twice, a tenant neve
 
 ## How it works
 
-0. **Survey** (only when the request names no behavior): find the implicit state machines in the code, list their states, transitions, and impossible combinations, and rank them by risk to choose what to model.
-1. **Scope**: define the questions, the expected contracts, and what is out of scope.
-2. **Investigation**: follow the code through entry points, state changes, and error recovery, and build a scenario matrix.
-3. **Incremental modeling**: start with the smallest model faithful to the code and add one mechanism or fault at a time.
-4. **Instrumentation**: capture traces from the real implementation.
-5. **Trace validation**: check that the model admits the observed executions.
-6. **Model checking**: run TLC and classify each counterexample as a property error, a model error, or a candidate defect.
-7. **Reproduction**: try to reproduce each candidate defect in the code.
-8. **Report**: record results, model limits, and what remains uncovered.
+1. **Scope**: write each question as a trigger and an observable outcome, with the contract it is judged against. When the request names no behavior, rank the implicit state machines in the code by risk and pick one.
+2. **Model**: start with the smallest model faithful to the code and add one mechanism or fault at a time.
+3. **Check**: run TLC through the bundled runner, which leaves a hashed receipt for every run.
+4. **Investigate and reproduce**: classify each counterexample as a property error, a model error or a candidate defect, and take every candidate to a failing test on the real code.
+5. **Report**: answer each question, with the disposition and evidence of every candidate and the limits of the check.
+6. **Leave the check behind**: write a small project skill that reruns the check, so the next change to the covered code can be verified.
 
-The full workflow is in [SKILL.md](SKILL.md), with per-stage details in [references/](references/).
+A result is judged by a few qualities, stated in [SKILL.md](SKILL.md): the model is true to the code, the property can fail (in the model and in the real code), every candidate is closed, behavior that depends on the environment (a database's locking, a queue's ordering) is observed instead of assumed, and the scope is stated honestly. Trace validation against the real implementation is available when the case calls for it; the guides in [references/](references/) are read on demand.
 
 A TLC result holds for the finite model that was checked; it is not an unbounded proof that the implementation is correct. The report states these limits explicitly.
 
@@ -65,7 +62,7 @@ Ask the agent in plain language:
 - "Use $probatio to model tenant access transitions and check isolation."
 - "Resume $probatio from `.analysis/payment-retries/progress.md`."
 
-Each analysis writes its artifacts to `.analysis/<run-id>/` in the target project, starting from the templates in `assets/workspace/`.
+Each analysis writes its artifacts to `.analysis/<run-id>/` in the target project. The optional `init` command creates that directory from the templates in `assets/workspace/`, stamped with the source revision.
 
 ## Tools
 

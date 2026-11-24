@@ -4,7 +4,7 @@ TLA+ modeling and TLC execution are the core of this workflow. A state diagram, 
 
 Locate a working Java runtime and genuine `tla2tools.jar`; verify TLC starts and record versions. If installation is needed and authorized, use official TLA+ release artifacts and record the release and checksum. Java requirements depend on the chosen release. This skill requires no Specula installation, MCP integration, or Maven build. If TLC is unavailable, continue useful modeling work but report formal verification as blocked. Respect offline constraints.
 
-Create `models/modeling.md` plus purpose-specific modules where useful: `base.tla` for shared source-faithful actions; `MC.tla`/`MC.cfg` for the baseline properties; `MC_hunt_<scenario>.cfg` (or a small wrapper module) for focused assumptions and bounds; and `Trace.tla`/`Trace.cfg` for trace replay against those same base actions. Add `instrumentation.md` to map model actions to source capture points. Keep files consolidated for a genuinely small scope, but document which role each module/configuration serves. Make state variables, initial states, transitions, and enabled properties explicit. Split configurations when scenarios require different assumptions.
+Create a short `models/modeling.md` plus purpose-specific modules where useful: `base.tla` for shared source-faithful actions; `MC.tla`/`MC.cfg` for the baseline properties; `MC_hunt_<scenario>.cfg` (or a small wrapper module) for focused assumptions and bounds; and `Trace.tla`/`Trace.cfg` for trace replay against those same base actions. Add `instrumentation.md` to map model actions to source capture points. Keep files consolidated for a genuinely small scope, but document which role each module/configuration serves. Make state variables, initial states, transitions, and enabled properties explicit. Split configurations when scenarios require different assumptions.
 
 For standard TLC releases, these are illustrative invocations; consult the installed release's help, choose resources for the host, and follow its command-prefix rules:
 
@@ -32,16 +32,15 @@ Before accepting the model, include an atomicity audit table in `modeling.md`: s
 
 ## Checks and evidence
 
+- Each configuration has at least one witness: an invariant that negates a deep state the scenario must reach (for example, "no actor writes after both have read"), run as a `regress` case expected to produce `violation`. A model that does nothing satisfies every safety property, so a safety pass counts only once its witnesses fail (*Specifying Systems* 14.5.3).
+- Fairness is written only as `WF` or `SF` of actions of `Next`. That keeps the specification machine closed: fairness then says only that enabled actions eventually happen, and cannot remove reachable states and hide a safety violation. Another temporal formula used as an assumption can (*Specifying Systems* 8.9.2).
+
 Maintain a coverage matrix: scoped question, source anchors, property, configuration, result, and limitation. Unsupported abstractions and exclusions are gaps, not passing properties. Preserve the exact model/configuration version for each run, including superseded runs.
 
 Parse/type-check first, then run finite configurations sized for the machine and question. Record exact tool/version, config, seed when relevant, resource limits, command, exit status, and output. Distinguish exhaustive exploration of a finite model from simulation, and both from an interrupted run.
 
 Check that substantive properties are enabled, reachable, and capable of failing. Type predicates or vacuously false antecedents do not establish behavioral correctness. Record liveness assumptions explicitly. SYMMETRY and VIEW are sound for invariants but not for temporal properties: check liveness in a configuration without them (the runner flags the combination in `warnings`). A liveness pass on a finite model is weak evidence, because bounds can end every behavior in stuttering that satisfies the property. Prefer separate focused configurations per bug mechanism so a counterexample identifies the scenario and does not inherit unrelated fault assumptions. If exhaustive BFS reaches a shallow diameter and deeper behavior matters, use a bounded simulation strategy as complementary evidence; always label simulation separately from exhaustive exploration.
 
-For each counterexample, follow the state changes back to the source and classify:
-
-1. **Property mismatch:** the expected property was unsupported or expressed incorrectly. Cite the actual contract before revising it; preserve valid requirements.
-2. **Model mismatch:** an action, initial state, fault, or abstraction does not represent reachable code. Correct the model and rerun affected configurations.
-3. **Candidate implementation defect:** both the contract and source correspondence hold. Attempt code-level reproduction using the normal verification phase.
+Classify each counterexample as SKILL.md describes (`PROPERTY`, `MODEL`, `CANDIDATE`, `UNRESOLVED`).
 
 Preserve counterexamples and model revisions. An error-free finite run supports only its recorded model and bounds. State whether implementation trace validation was performed; without it, describe the source-to-model audit and its remaining limitations.
