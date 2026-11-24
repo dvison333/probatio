@@ -1,0 +1,14 @@
+{
+  "prompt": "This repository implements a document store with optimistic locking. Its README states the contract. Determine whether the code guarantees that a caller never overwrites or deletes content it has not seen. Work only inside this directory. When you are done, write FINDINGS.md whose first three lines are exactly:\nVERDICT: DEFECT (or: VERDICT: NO DEFECT)\nLOCATION: <file>#<method> (or: LOCATION: none)\nREPRO: <one shell command, run from the repository root, that exits non-zero while the defect is present> (or: REPRO: none)\nAfter those lines, explain the mechanism and the evidence you gathered.",
+  "variants": {
+    "buggy": {
+      "verdict": "DEFECT",
+      "location": "Versions|DocStore",
+      "mechanism": "(?i)\\bABA\\b|reus|restart|reset|recreat|re-creat|delete[^.]{0,80}creat"
+    },
+    "fixed": {
+      "verdict": "NO DEFECT",
+      "overlay": "fixed"
+    }
+  }
+}
