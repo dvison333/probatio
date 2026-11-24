@@ -1,0 +1,14 @@
+{
+  "prompt": "This repository implements a shop that reserves stock, charges through a payment gateway and confirms orders. Its README states how it runs, what the gateway may do, and a three-rule contract. Determine whether the code guarantees that contract for every order of Shop operations and every gateway behaviour the README allows. Work only inside this directory. When you are done, write FINDINGS.md whose first three lines are exactly:\nVERDICT: DEFECT (or: VERDICT: NO DEFECT)\nLOCATION: <file>#<method> (or: LOCATION: none)\nREPRO: <one shell command, run from the repository root, that exits non-zero while the defect is present> (or: REPRO: none)\nAfter those lines, explain the mechanism and the evidence you gathered.",
+  "variants": {
+    "buggy": {
+      "verdict": "DEFECT",
+      "location": "Inventory|Reaper|OrderService",
+      "mechanism": "(?i)expir|reap|TTL"
+    },
+    "fixed": {
+      "verdict": "NO DEFECT",
+      "overlay": "fixed"
+    }
+  }
+}

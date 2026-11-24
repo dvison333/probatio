@@ -43,5 +43,9 @@ The task asks for a `FINDINGS.md` starting with `VERDICT:`, `LOCATION:` and `REP
 ## Fixtures
 
 - `coupon`: a coupon service whose `redeem` checks and then acts, so two concurrent requests credit one coupon twice. `RefundService` looks similar and is correct. `fixed/` holds the corrected sources.
+- `docstore`: optimistic locking where every operation is atomic, but delete-then-create restarts the version at 1, so a stale update passes the check.
+- `shop`: orders, stock reservations, a payment gateway that can time out, a reaper and a retrier, in about 600 lines. Every operation is atomic; the defect needs five of them in a row and three components. The corrected variant still expires reservations of pending orders, which looks like the defect and is harmless there. `check/Explore.java` replays every operation sequence to a depth on the real classes: it finds the oversell in `repo/` and nothing with `fixed/`.
+
+Check a new fixture by machine before spending sessions on it. The first `docstore` carried a second, unplanted defect, and every agent found it.
 
 To add one, create `fixtures/NAME/repo/` (the project the agent sees), an optional overlay directory per variant, and `truth.json` with the prompt and each variant's expected verdict, location pattern and mechanism pattern.
