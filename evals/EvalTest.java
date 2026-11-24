@@ -50,7 +50,9 @@ public class EvalTest {
                 true, true);
             expect(found, Map.of("verdict_correct", true, "false_positive", false, "located", true, "mechanism_named", true,
                 "reproduced", true, "repro_passes_when_corrected", true, "tlc_direct", true, "mentions_tlc_without_receipt", false));
-            expect(found, Map.of("tlc_receipts", Map.of("violation", 1L), "cost_usd", 1.5, "turns", 7L, "duration_s", 61L,
+            expect(found, Map.of("duration_s", 90L));
+            expect(found, Map.of("generated_skills", List.of(".claude/skills/coupon-redemption"), "statechart_used", false));
+            expect(found, Map.of("tlc_receipts", Map.of("violation", 1L), "cost_usd", 1.5, "turns", 7L, "segments", 2L,
                 "references_read", List.of("formal.md"), "skill_invoked", true, "tool_calls", 3L, "session_completed", true));
 
             Map<String, Object> missed = grade(tmp.resolve("missed"), "buggy",
@@ -108,6 +110,10 @@ public class EvalTest {
             Files.writeString(work.resolve("FINDINGS.md"), findings);
         }
         if (receipt) {
+            for (String name : List.of("probatio", "coupon-redemption")) {
+                Files.createDirectories(work.resolve(".claude/skills").resolve(name));
+                Files.writeString(work.resolve(".claude/skills").resolve(name).resolve("SKILL.md"), "---\nname: " + name + "\n---\n");
+            }
             Files.createDirectories(work.resolve(".analysis/run/checks/a"));
             Files.writeString(work.resolve(".analysis/run/checks/a/receipt.json"), "{\"result\": \"violation\", \"jar_sha256\": \"abc\"}");
             Files.createDirectories(work.resolve("fake"));
@@ -120,10 +126,11 @@ public class EvalTest {
                 "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"references/ignored.md\"},"
                     + "{\"type\":\"tool_use\",\"name\":\"Read\",\"input\":{\"file_path\":\"/x/.claude/skills/probatio/references/formal.md\"}},"
                     + "{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"java -cp t.jar tlc2.TLC M.tla\"}}]}}",
-                "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.5,\"num_turns\":7,\"duration_ms\":61000}") + "\n");
+                "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.0,\"num_turns\":6,\"duration_ms\":61000}",
+                "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.5,\"num_turns\":1,\"duration_ms\":2000}") + "\n");
         }
         Files.writeString(out.resolve("run.json"), Json.write(Map.of("fixture", "coupon", "variant", variant, "arm", "skill",
-            "model", "test", "truth", truth.toString()), true));
+            "skills", List.of("probatio"), "model", "test", "wall_s", 90L, "truth", truth.toString()), true));
         return Eval.grade(out);
     }
 
