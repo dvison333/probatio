@@ -68,6 +68,23 @@ public class EvalTest {
 
             Map<String, Object> silent = grade(tmp.resolve("silent"), "fixed", null, false, false);
             expect(silent, Map.of("verdict_correct", false, "false_positive", false));
+            Path openTruth = tmp.resolve("open/truth.json");
+            Files.createDirectories(openTruth.getParent());
+            Files.writeString(openTruth, "{\"prompt\": \"p\", \"variants\": {\"asis\": {}}}");
+            Map<String, Object> unknown = grade(tmp.resolve("unknown"), "asis",
+                "VERDICT: DEFECT\nLOCATION: src/CouponService.java#redeem\nREPRO: " + REPRO + "\n", false, false, openTruth);
+            expect(unknown, Map.of("verdict", "DEFECT", "location", "src/CouponService.java#redeem", "reproduced", true));
+            if (unknown.containsKey("verdict_correct") || unknown.containsKey("repro_passes_when_corrected")) {
+                throw new AssertionError("a fixture without a known answer must not be graded for correctness: " + unknown);
+            }
+            Path linked = tmp.resolve("linked");
+            Files.createDirectories(linked.resolve("real"));
+            Files.writeString(linked.resolve("real/file.txt"), "x");
+            Files.createSymbolicLink(linked.resolve("alias"), Path.of("real"));
+            Eval.copyTree(linked, tmp.resolve("linked-copy"), java.util.Set.of());
+            if (!Files.isSymbolicLink(tmp.resolve("linked-copy/alias")) || !Files.exists(tmp.resolve("linked-copy/alias/file.txt"))) {
+                throw new AssertionError("a link to a directory must be copied as a working link");
+            }
             System.out.println("grader tests passed");
         } finally {
             Eval.deleteTree(tmp);
@@ -76,6 +93,11 @@ public class EvalTest {
 
     /** Lay out what a session would leave, then grade it. */
     static Map<String, Object> grade(Path out, String variant, String findings, boolean receipt, boolean transcript) throws Exception {
+        return grade(out, variant, findings, receipt, transcript, FIXTURE.resolve("truth.json"));
+    }
+
+    static Map<String, Object> grade(Path out, String variant, String findings, boolean receipt, boolean transcript, Path truth)
+            throws Exception {
         Path work = out.resolve("work");
         Eval.copyTree(FIXTURE.resolve("repo"), work, java.util.Set.of());
         if (variant.equals("fixed")) {
@@ -101,7 +123,7 @@ public class EvalTest {
                 "{\"type\":\"result\",\"subtype\":\"success\",\"total_cost_usd\":1.5,\"num_turns\":7,\"duration_ms\":61000}") + "\n");
         }
         Files.writeString(out.resolve("run.json"), Json.write(Map.of("fixture", "coupon", "variant", variant, "arm", "skill",
-            "model", "test", "truth", FIXTURE.resolve("truth.json").toString()), true));
+            "model", "test", "truth", truth.toString()), true));
         return Eval.grade(out);
     }
 
