@@ -278,7 +278,7 @@ public class ProbatioTest {
         git(repo, "add", "a.txt");
         git(repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init");
         Files.write(repo.resolve("a.txt"), new byte[] {'o', 'l', (byte) 0xe1, '\n'});
-        Files.writeString(repo.resolve("café.txt"), "new");
+        boolean nameable = writeAccented(repo, "new");
         Files.createDirectories(repo.resolve(".analysis/old-run/states"));
         Files.writeString(repo.resolve(".analysis/old-run/states/huge.bin"), "earlier runs are not source");
         Path templates = ROOT.resolve("assets/workspace");
@@ -289,13 +289,33 @@ public class ProbatioTest {
         for (String name : List.of("findings", "checks", "harness", "traces", "controls", "models/modeling.md", "report.md")) {
             assertTrue(Files.exists(tmp.resolve("ws").resolve(name)), name);
         }
-        Files.writeString(repo.resolve("café.txt"), "changed");
+        writeAccented(repo, "changed");
         Workspace.init(repo, tmp.resolve("ws2"), "x", templates);
-        assertTrue(!Files.readString(tmp.resolve("ws2/scope.md")).contains(digestOf((String) summary.get("working_tree"))),
-            "untracked content with a non-ASCII name is hashed");
+        if (nameable) {
+            assertTrue(!Files.readString(tmp.resolve("ws2/scope.md")).contains(digestOf((String) summary.get("working_tree"))),
+                "untracked content with a non-ASCII name is hashed");
+        } else {
+            assertTrue(scope.contains("not hashed: 1"), "a name this platform cannot represent is counted, not skipped: " + scope);
+        }
         expectThrows(ProbatioException.class, "already exists", () -> Workspace.init(repo, tmp.resolve("ws"), "x", templates));
         Workspace.UntrackedDigest gone = Workspace.untrackedDigest(repo, List.of("café.txt", "deleted-meanwhile.txt"));
-        assertEquals(1, gone.notHashed(), "a listed path that cannot be hashed is counted");
+        assertEquals(nameable ? 1 : 2, gone.notHashed(), "a listed path that cannot be hashed is counted");
+    }
+
+    /**
+     * Writes café.txt in the repository and says whether this JVM can name it. Under a C locale it cannot, so
+     * the file is created from its UTF-8 bytes by the shell, the way a checkout made elsewhere would leave it.
+     */
+    static boolean writeAccented(Path repo, String content) throws Exception {
+        try {
+            Files.writeString(repo.resolve("café.txt"), content);
+            return true;
+        } catch (java.nio.file.InvalidPathException e) {
+            Process shell = new ProcessBuilder("sh", "-c", "printf '%s' \"$1\" > \"$(printf 'caf\\303\\251.txt')\"", "sh", content)
+                .directory(repo.toFile()).redirectErrorStream(true).start();
+            assertEquals(0, shell.waitFor(), new String(shell.getInputStream().readAllBytes()));
+            return false;
+        }
     }
 
     static void initWithoutGit(Path tmp) throws Exception {
