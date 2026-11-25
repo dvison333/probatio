@@ -1119,9 +1119,22 @@ final class Args {
         if (options.containsKey("jar")) {
             return Path.of(options.get("jar"));
         }
-        String home = Optional.ofNullable(System.getenv("PROBATIO_HOME")).filter(s -> !s.isEmpty())
-            .orElse(Path.of(System.getProperty("user.home"), ".probatio").toString());
-        return Path.of(home, "tla2tools.jar");
+        boolean windows = System.getProperty("os.name", "").startsWith("Windows");
+        return Path.of(home(System.getenv(), System.getProperty("user.home"), windows), "tla2tools.jar");
+    }
+
+    /**
+     * Where the installer put the toolchain. install.sh uses $HOME, which is not always the account's home
+     * directory (a container may set it elsewhere), so HOME wins when it is set. install.ps1 uses the profile
+     * directory, which is what the JVM reports on Windows; a HOME exported there by a POSIX shell is not it.
+     */
+    static String home(Map<String, String> env, String userHome, boolean windows) {
+        String explicit = env.getOrDefault("PROBATIO_HOME", "");
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+        String shellHome = env.getOrDefault("HOME", "");
+        return Path.of(windows || shellHome.isEmpty() ? userHome : shellHome, ".probatio").toString();
     }
 
     String java() {

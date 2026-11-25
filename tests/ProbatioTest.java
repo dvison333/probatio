@@ -36,6 +36,7 @@ public class ProbatioTest {
         List<Test> tests = List.of(
             new Test("commented-out or empty property sections do not count", false, ProbatioTest::configGuard),
             new Test("comment stripping keeps live text", false, ProbatioTest::commentStripping),
+            new Test("the install directory is the one the installer used", false, ProbatioTest::installDirectory),
             new Test("action and initial-state property violations are evidence", false, ProbatioTest::propertyViolations),
             new Test("trace rejects bad sequences and missing state", false, ProbatioTest::badSequences),
             new Test("malformed, empty and deeply nested traces are rejections", false, ProbatioTest::malformedTraces),
@@ -104,6 +105,15 @@ public class ProbatioTest {
         Files.writeString(tmp.resolve("M.cfg"), "INIT TraceInit\nNEXT TraceNext\nINVARIANT TraceIncomplete\n");
         expectThrows(ProbatioException.class, "rerun with --trace", () -> Tlc.run(new Tlc.Request(
             tmp.resolve("M.tla"), tmp.resolve("M.cfg"), tmp.resolve("out"), jar, JAVA, 120, 2, "1g", false)));
+    }
+
+    static void installDirectory(Path tmp) {
+        assertEquals("/custom", Args.home(Map.of("PROBATIO_HOME", "/custom", "HOME", "/home/a"), "/root", false));
+        // install.sh installs under $HOME; in a container that is not the account's home directory.
+        assertEquals(Path.of("/github/home", ".probatio").toString(), Args.home(Map.of("HOME", "/github/home"), "/root", false));
+        assertEquals(Path.of("/root", ".probatio").toString(), Args.home(Map.of("PROBATIO_HOME", "", "HOME", ""), "/root", false));
+        // install.ps1 installs under the profile directory; a HOME set by a POSIX shell on Windows is not it.
+        assertEquals(Path.of("C:\\Users\\a", ".probatio").toString(), Args.home(Map.of("HOME", "/c/Users/a"), "C:\\Users\\a", true));
     }
 
     static void commentStripping(Path tmp) {
@@ -558,6 +568,7 @@ public class ProbatioTest {
     static void deleteTree(Path root) throws Exception {
         try (Stream<Path> paths = Files.walk(root)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                path.toFile().setWritable(true); // Git marks its objects read-only, and Windows then refuses to delete them.
                 Files.delete(path);
             }
         }
