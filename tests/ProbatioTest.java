@@ -36,6 +36,7 @@ public class ProbatioTest {
         List<Test> tests = List.of(
             new Test("commented-out or empty property sections do not count", false, ProbatioTest::configGuard),
             new Test("comment stripping keeps live text", false, ProbatioTest::commentStripping),
+            new Test("every command the documentation shows is one the runner accepts", false, ProbatioTest::documentedCommands),
             new Test("the install directory is the one the installer used", false, ProbatioTest::installDirectory),
             new Test("action and initial-state property violations are evidence", false, ProbatioTest::propertyViolations),
             new Test("trace rejects bad sequences and missing state", false, ProbatioTest::badSequences),
@@ -114,6 +115,38 @@ public class ProbatioTest {
         assertEquals(Path.of("/root", ".probatio").toString(), Args.home(Map.of("PROBATIO_HOME", "", "HOME", ""), "/root", false));
         // install.ps1 installs under the profile directory; a HOME set by a POSIX shell on Windows is not it.
         assertEquals(Path.of("C:\\Users\\a", ".probatio").toString(), Args.home(Map.of("HOME", "/c/Users/a"), "C:\\Users\\a", true));
+    }
+
+    /** A runner command in prose or a code block: the subcommand, then the rest up to a comment, backtick or table bar. */
+    static final java.util.regex.Pattern DOCUMENTED = java.util.regex.Pattern.compile(
+        "Probatio\\.java\\s+([a-z]+)(?=[\\s`|]|$)([^`|#\\n]*)");
+    static final java.util.regex.Pattern OPTION = java.util.regex.Pattern.compile("(?<=\\s)--([a-z-]+)");
+
+    static void documentedCommands(Path tmp) throws Exception {
+        List<Path> documents = new ArrayList<>(List.of(ROOT.resolve("SKILL.md"), ROOT.resolve("README.md"), ROOT.resolve("README.pt-BR.md")));
+        try (Stream<Path> references = Files.list(ROOT.resolve("references"))) {
+            documents.addAll(references.filter(p -> p.toString().endsWith(".md")).sorted().toList());
+        }
+        Set<String> shown = new TreeSet<>();
+        for (Path document : documents) {
+            java.util.regex.Matcher command = DOCUMENTED.matcher(Files.readString(document));
+            while (command.find()) {
+                String where = ROOT.relativize(document) + ": Probatio.java " + command.group(1) + command.group(2);
+                Probatio.Command known = Probatio.COMMANDS.get(command.group(1));
+                assertTrue(known != null, "unknown command in " + where);
+                java.util.regex.Matcher option = OPTION.matcher(command.group(2));
+                while (option.find()) {
+                    assertTrue(known.options().contains(option.group(1)) || known.flags().contains(option.group(1)),
+                        "option --" + option.group(1) + " is not accepted by " + command.group(1) + " in " + where);
+                }
+                shown.add(command.group(1));
+            }
+        }
+        assertEquals(new TreeSet<>(Probatio.COMMANDS.keySet()), shown, "every runner command is documented somewhere");
+        String skill = Files.readString(ROOT.resolve("SKILL.md"));
+        for (String needed : List.of("doctor", "tlc", "regress")) {
+            assertTrue(skill.contains("Probatio.java " + needed), "SKILL.md shows how to run " + needed);
+        }
     }
 
     static void commentStripping(Path tmp) {

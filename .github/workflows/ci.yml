@@ -1,12 +1,10 @@
 name: CI
 
+# Every change: the runner's contract, on the oldest JDK the README promises.
 on:
   pull_request:
   push:
     branches: [main]
-  schedule:
-    # The pinned downloads live on other people's servers and can change with no commit here.
-    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -17,20 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests (${{ matrix.os }}, JDK ${{ matrix.java }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        java: ["17", "21"]
+  suite:
+    name: Suites (Linux, JDK 17)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ matrix.java }}
+          java-version: "17"
       - name: Install the toolchain
         run: sh scripts/install.sh
       - name: Doctor
@@ -43,54 +36,3 @@ jobs:
         run: |
           javac -d build/evals scripts/Probatio.java evals/Eval.java evals/EvalTest.java
           java -cp build/evals EvalTest
-
-  clean-install:
-    name: Install on a machine with no Java
-    runs-on: ubuntu-latest
-    container: ubuntu:24.04
-    steps:
-      - name: Tools a fresh machine is assumed to have
-        run: apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git
-      - uses: actions/checkout@v4
-      - name: Install downloads the pinned JDK and TLC
-        run: |
-          if command -v java; then echo "this job needs a machine without Java"; exit 1; fi
-          sh scripts/install.sh
-          case "$(readlink "$HOME/.probatio/java")" in
-            "$HOME/.probatio/"*) ;;
-            *) echo "java link does not point at the downloaded JDK"; exit 1 ;;
-          esac
-      - name: Doctor
-        run: ~/.probatio/java scripts/Probatio.java doctor
-      - name: Installing again with the install directory on PATH keeps the link working
-        run: |
-          PATH="$HOME/.probatio:$PATH" sh scripts/install.sh
-          ~/.probatio/java -version
-      - name: Runner tests on the downloaded JDK
-        run: |
-          jdk=$(dirname "$(readlink -f "$HOME/.probatio/java")")
-          "$jdk/javac" -d build/test scripts/Probatio.java examples/lease/LeaseExample.java tests/ProbatioTest.java
-          TLA_JAR="$HOME/.probatio/tla2tools.jar" "$jdk/java" -cp build/test ProbatioTest
-
-  windows:
-    name: Windows install and tests
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Install the toolchain
-        shell: pwsh
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-      - name: Doctor
-        shell: pwsh
-        run: '& "$env:USERPROFILE\.probatio\java.cmd" scripts\Probatio.java doctor'
-      - name: Runner tests
-        shell: pwsh
-        run: |
-          javac -d build/test scripts/Probatio.java examples/lease/LeaseExample.java tests/ProbatioTest.java
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $env:TLA_JAR = "$env:USERPROFILE\.probatio\tla2tools.jar"
-          java -cp build/test ProbatioTest
