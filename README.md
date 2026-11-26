@@ -21,6 +21,39 @@ A result is judged by a few qualities, stated in [SKILL.md](SKILL.md): the model
 
 A TLC result holds for the finite model that was checked; it is not an unbounded proof that the implementation is correct. The report states these limits explicitly.
 
+## Benchmark
+
+Measured on 2026-11-23 with the harness in [evals/](evals/README.md): each run is one headless Claude Code session on a small project with a known answer, graded by code. The request asks for formal verification of one stated contract.
+
+- **Fixtures:** a coupon credited twice by two concurrent requests; a stale update that passes an optimistic lock after a delete and re-create; and an oversell that needs five operations across three components, in about 600 lines. Each has a defective and a corrected variant.
+- **Models:** the Claude Code aliases `sonnet` and `haiku`.
+- **Skill:** the one in this repository, with TLC v1.7.4.
+
+| | `sonnet` | `haiku` |
+| --- | --- | --- |
+| Runs | 6 | 6 |
+| Correct verdict (defect found, or none reported on the corrected code) | 6 | 6 |
+| TLC run through the runner, with a receipt | 6 | 6 |
+| A passing check also shown failing on a broken variant, with its own receipt | 6 | 6 |
+| Every candidate closed with a disposition | 6 | 6 |
+| The check seen failing on the real code, in a scratch copy | 6 | 6 |
+| A project skill left behind to rerun the check | 6 | 6 |
+| Median time per run | 93 s | 274 s |
+| Mean cost per run | $0.25 | $0.06 |
+
+What these numbers do not show:
+
+- **They do not show that Probatio finds defects a model would miss.** On these fixtures the same models reach the same verdicts with no skill at all. The benchmark measures the evidence a run leaves: receipts, a check that can fail, closed candidates and a check that can be rerun.
+- **One run per cell.** Sessions are not deterministic, and small differences are noise.
+- **The request matters.** When the request only asks whether the contract holds, without asking for formal verification, `sonnet` loaded the skill and skipped the TLC run in 2 of 2 runs. `haiku` ran it in 2 of 2.
+- **Two rows are counted by searching the reports** for the dispositions and for the scratch-copy break. Two runs were read in full and matched.
+- **The raw results were not kept.** To measure again:
+
+```bash
+javac -d build/evals scripts/Probatio.java evals/Eval.java evals/EvalTest.java
+java -cp build/evals Eval run --fixture shop --variant buggy --arm skill --ask formal --model sonnet --out /a/path/outside/this/repository
+```
+
 ## Requirements
 
 - A JDK 17 or newer (a JRE is not enough: the tools run from source)

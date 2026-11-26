@@ -21,6 +21,39 @@ Um resultado é julgado por algumas qualidades, descritas no [SKILL.md](SKILL.md
 
 Um resultado do TLC vale para o modelo finito verificado, não é uma prova ilimitada de que a implementação está correta. O relatório deixa esses limites explícitos.
 
+## Benchmark
+
+Medido em 23/11/2026 com o executor em [evals/](evals/README.md): cada execução é uma sessão do Claude Code sem interface, num projeto pequeno com resposta conhecida, corrigida por código. O pedido solicita a verificação formal de um contrato declarado.
+
+- **Cenários:** um cupom creditado duas vezes por duas requisições simultâneas; uma atualização desatualizada que passa pela trava otimista depois de apagar e recriar o documento; e uma venda em excesso que exige cinco operações em três componentes, em cerca de 600 linhas. Cada um tem uma variante com defeito e uma corrigida.
+- **Modelos:** os aliases `sonnet` e `haiku` do Claude Code.
+- **Skill:** a deste repositório, com TLC v1.7.4.
+
+| | `sonnet` | `haiku` |
+| --- | --- | --- |
+| Execuções | 6 | 6 |
+| Veredito correto (defeito encontrado, ou nenhum acusado no código corrigido) | 6 | 6 |
+| TLC executado pelo runner, com recibo | 6 | 6 |
+| Checagem que passa também vista falhando numa variante quebrada, com recibo próprio | 6 | 6 |
+| Todo candidato fechado com um destino | 6 | 6 |
+| Checagem vista falhando no código real, numa cópia descartável | 6 | 6 |
+| Skill do projeto deixada para rodar a checagem de novo | 6 | 6 |
+| Tempo mediano por execução | 93 s | 274 s |
+| Custo médio por execução | US$ 0,25 | US$ 0,06 |
+
+O que esses números não mostram:
+
+- **Não mostram que o Probatio encontra defeitos que o modelo deixaria passar.** Nestes cenários, os mesmos modelos chegam aos mesmos vereditos sem skill nenhuma. O benchmark mede a evidência que uma execução deixa: recibos, uma checagem que consegue falhar, candidatos fechados e uma checagem que pode ser repetida.
+- **Uma execução por célula.** As sessões não são determinísticas, e diferenças pequenas são ruído.
+- **O pedido importa.** Quando o pedido só pergunta se o contrato vale, sem pedir verificação formal, o `sonnet` carregou a skill e pulou a execução do TLC em 2 de 2 execuções. O `haiku` executou em 2 de 2.
+- **Duas linhas são contadas por busca nos relatórios**, pelos destinos e pela quebra na cópia descartável. Duas execuções foram lidas por inteiro e conferiram.
+- **Os resultados brutos não foram guardados.** Para medir de novo:
+
+```bash
+javac -d build/evals scripts/Probatio.java evals/Eval.java evals/EvalTest.java
+java -cp build/evals Eval run --fixture shop --variant buggy --arm skill --ask formal --model sonnet --out /um/caminho/fora/deste/repositorio
+```
+
 ## Requisitos
 
 - Um JDK 17 ou mais recente (um JRE não basta, porque as ferramentas rodam direto do código-fonte)
