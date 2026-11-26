@@ -67,26 +67,35 @@ public class Probatio {
         }
     }
 
+    /** What a command takes: how many positional arguments, which options carry a value, which are bare flags. */
+    record Command(int positional, Set<String> options, Set<String> flags) {}
+
+    /** The whole command line, in one place, so the documentation can be checked against it. */
+    static final Map<String, Command> COMMANDS = Map.of(
+        "doctor", new Command(0, Set.of("jar", "java"), Set.of()),
+        "init", new Command(0, Set.of("source", "out", "scope"), Set.of()),
+        "tlc", new Command(2, Set.of("out", "jar", "java", "timeout", "workers", "heap"), Set.of("trace")),
+        "trace", new Command(2, Set.of("out"), Set.of()),
+        "regress", new Command(1, Set.of("out", "jar", "java", "timeout"), Set.of()));
+
     static int dispatch(String[] argv) throws IOException {
-        if (argv.length == 0) {
+        Command command = argv.length == 0 ? null : COMMANDS.get(argv[0]);
+        if (command == null) {
             System.err.println(USAGE);
             return 2;
         }
-        String[] rest = java.util.Arrays.copyOfRange(argv, 1, argv.length);
+        Args a = Args.parse(java.util.Arrays.copyOfRange(argv, 1, argv.length), command);
         switch (argv[0]) {
             case "doctor" -> {
-                Args a = Args.parse(rest, 0, Set.of("jar", "java"), Set.of());
                 return Doctor.report(Doctor.run(a.jar(), a.java(), skillDir().resolve("scripts/toolchain.env")));
             }
             case "init" -> {
-                Args a = Args.parse(rest, 0, Set.of("source", "out", "scope"), Set.of());
                 Map<String, Object> summary = Workspace.init(a.requiredPath("source"), a.requiredPath("out"),
                     a.required("scope"), skillDir().resolve("assets/workspace"));
                 System.out.println(Json.write(summary, true));
                 return 0;
             }
             case "tlc" -> {
-                Args a = Args.parse(rest, 2, Set.of("out", "jar", "java", "timeout", "workers", "heap"), Set.of("trace"));
                 Map<String, Object> receipt = Tlc.run(new Tlc.Request(
                     a.path(0), a.path(1), a.requiredPath("out"), a.jar(), a.java(),
                     a.number("timeout", 120), a.integer("workers", 2), a.option("heap", "1g"), a.flag("trace")));
@@ -94,7 +103,6 @@ public class Probatio {
                 return exitCode((String) receipt.get("result"));
             }
             case "trace" -> {
-                Args a = Args.parse(rest, 2, Set.of("out"), Set.of());
                 Map<String, Object> outcome = new LinkedHashMap<>();
                 try {
                     TraceCheck.Compiled compiled = TraceCheck.compile(a.path(0), a.path(1), a.requiredPath("out"));
@@ -109,15 +117,11 @@ public class Probatio {
                 return outcome.get("result").equals("invalid") ? exitCode("invalid") : 0;
             }
             case "regress" -> {
-                Args a = Args.parse(rest, 1, Set.of("out", "jar", "java", "timeout"), Set.of());
                 List<Map<String, Object>> results = Regress.evaluate(
                     a.path(0), a.requiredPath("out"), a.jar(), a.java(), a.number("timeout", 120));
                 return Regress.report(results);
             }
-            default -> {
-                System.err.println(USAGE);
-                return 2;
-            }
+            default -> throw new IllegalStateException("no handler for command " + argv[0]);
         }
     }
 
@@ -1053,23 +1057,23 @@ final class Args {
     final Map<String, String> options = new LinkedHashMap<>();
     final Set<String> flags = new LinkedHashSet<>();
 
-    static Args parse(String[] argv, int positionalCount, Set<String> valueOptions, Set<String> flagOptions) {
+    static Args parse(String[] argv, Probatio.Command command) {
         Args a = new Args();
         for (int i = 0; i < argv.length; i++) {
             String arg = argv[i];
             String name = arg.startsWith("--") ? arg.substring(2) : null;
             if (name == null) {
                 a.positional.add(arg);
-            } else if (flagOptions.contains(name)) {
+            } else if (command.flags().contains(name)) {
                 a.flags.add(name);
-            } else if (valueOptions.contains(name) && i + 1 < argv.length) {
+            } else if (command.options().contains(name) && i + 1 < argv.length) {
                 a.options.put(name, argv[++i]);
             } else {
                 throw new ProbatioException("Unknown or incomplete option: " + arg + "\n" + Probatio.USAGE);
             }
         }
-        if (a.positional.size() != positionalCount) {
-            throw new ProbatioException("Expected " + positionalCount + " positional argument(s)\n" + Probatio.USAGE);
+        if (a.positional.size() != command.positional()) {
+            throw new ProbatioException("Expected " + command.positional() + " positional argument(s)\n" + Probatio.USAGE);
         }
         return a;
     }
@@ -1119,9 +1123,22 @@ final class Args {
         if (options.containsKey("jar")) {
             return Path.of(options.get("jar"));
         }
-        String home = Optional.ofNullable(System.getenv("PROBATIO_HOME")).filter(s -> !s.isEmpty())
-            .orElse(Path.of(System.getProperty("user.home"), ".probatio").toString());
-        return Path.of(home, "tla2tools.jar");
+        boolean windows = System.getProperty("os.name", "").startsWith("Windows");
+        return Path.of(home(System.getenv(), System.getProperty("user.home"), windows), "tla2tools.jar");
+    }
+
+    /**
+     * Where the installer put the toolchain. install.sh uses $HOME, which is not always the account's home
+     * directory (a container may set it elsewhere), so HOME wins when it is set. install.ps1 uses the profile
+     * directory, which is what the JVM reports on Windows; a HOME exported there by a POSIX shell is not it.
+     */
+    static String home(Map<String, String> env, String userHome, boolean windows) {
+        String explicit = env.getOrDefault("PROBATIO_HOME", "");
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+        String shellHome = env.getOrDefault("HOME", "");
+        return Path.of(windows || shellHome.isEmpty() ? userHome : shellHome, ".probatio").toString();
     }
 
     String java() {

@@ -1,0 +1,38 @@
+name: CI
+
+# Every change: the runner's contract, on the oldest JDK the README promises.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: Suites (Linux, JDK 17)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install the toolchain
+        run: sh scripts/install.sh
+      - name: Doctor
+        run: ~/.probatio/java scripts/Probatio.java doctor
+      - name: Runner tests
+        run: |
+          javac -d build/test scripts/Probatio.java examples/lease/LeaseExample.java tests/ProbatioTest.java
+          TLA_JAR="$HOME/.probatio/tla2tools.jar" java -cp build/test ProbatioTest
+      - name: Eval grader tests
+        run: |
+          javac -d build/evals scripts/Probatio.java evals/Eval.java evals/EvalTest.java
+          java -cp build/evals EvalTest

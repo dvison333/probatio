@@ -1,0 +1,122 @@
+name: Platforms
+
+# The code that depends on the operating system is the two installers and the handling of paths and file
+# names. It is checked when it changes, and every week: the pinned downloads live on other people's servers
+# and have changed with no commit here.
+on:
+  pull_request:
+    paths: ["scripts/**", "tests/**", ".github/workflows/platforms.yml"]
+  push:
+    branches: [main]
+    paths: ["scripts/**", "tests/**", ".github/workflows/platforms.yml"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      fail_on_purpose:
+        description: Fail one job, to check that a failed scheduled run opens an issue
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platforms-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-install:
+    name: Linux with no Java
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    steps:
+      - name: Tools a fresh machine is assumed to have
+        run: apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git
+      - uses: actions/checkout@v4
+      - name: Install downloads the pinned JDK and TLC
+        run: |
+          if command -v java; then echo "this job needs a machine without Java"; exit 1; fi
+          sh scripts/install.sh
+          case "$(readlink "$HOME/.probatio/java")" in
+            "$HOME/.probatio/"*) ;;
+            *) echo "java link does not point at the downloaded JDK"; exit 1 ;;
+          esac
+      - name: Doctor
+        run: ~/.probatio/java scripts/Probatio.java doctor
+      - name: Installing again with the install directory on PATH keeps the link working
+        run: |
+          PATH="$HOME/.probatio:$PATH" sh scripts/install.sh
+          ~/.probatio/java -version
+      - name: Runner tests on the downloaded JDK
+        run: |
+          jdk=$(dirname "$(readlink -f "$HOME/.probatio/java")")
+          "$jdk/javac" -d build/test scripts/Probatio.java examples/lease/LeaseExample.java tests/ProbatioTest.java
+          TLA_JAR="$HOME/.probatio/tla2tools.jar" "$jdk/java" -cp build/test ProbatioTest
+      - name: Fail on purpose
+        if: inputs.fail_on_purpose
+        run: exit 1
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install the toolchain
+        run: sh scripts/install.sh
+      - name: Doctor
+        run: ~/.probatio/java scripts/Probatio.java doctor
+      - name: Runner tests
+        run: |
+          javac -d build/test scripts/Probatio.java examples/lease/LeaseExample.java tests/ProbatioTest.java
+          TLA_JAR="$HOME/.probatio/tla2tools.jar" java -cp build/test ProbatioTest
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install the toolchain
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+      - name: Doctor
+        shell: pwsh
+        run: '& "$env:USERPROFILE\.probatio\java.cmd" scripts\Probatio.java doctor'
+      - name: Runner tests
+        shell: pwsh
+        run: |
+          javac -d build/test scripts/Probatio.java examples/lease/LeaseExample.java tests/ProbatioTest.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:TLA_JAR = "$env:USERPROFILE\.probatio\tla2tools.jar"
+          java -cp build/test ProbatioTest
+
+  report:
+    name: Open an issue when the unattended run fails
+    # Nobody is watching a scheduled run, and GitHub mails only whoever last edited the workflow.
+    if: failure() && (github.event_name == 'schedule' || inputs.fail_on_purpose)
+    needs: [clean-install, macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Platform check failed: installing or running Probatio is broken somewhere"
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body "The platform check failed with no pull request involved: $RUN_URL. A pinned download may have changed on its server (see scripts/toolchain.env), or a runner image changed."
+          fi
